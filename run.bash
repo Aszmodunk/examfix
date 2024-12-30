@@ -48,6 +48,9 @@ function configure_dns() {
     echo "Installing and configuring DNS server..."
     sudo dnf install -y bind
     wget -O /var/named/myvspj.cz https://alpha.kts.vspj.cz/~apribyl/myvspj.cz.txt
+    if [ ! -d "/var/named" ]; then
+        sudo mkdir -p /var/named
+    fi
     sudo systemctl enable named
     sudo systemctl start named
 }
@@ -56,28 +59,38 @@ function configure_dns() {
 function configure_smtp() {
     echo "Configuring Postfix SMTP server..."
     sudo dnf install -y postfix
-    sudo systemctl enable postfix
-    sudo systemctl start postfix
+    if systemctl list-units --type=service | grep -q postfix; then
+        sudo systemctl enable postfix
+        sudo systemctl start postfix
+    else
+        echo "Postfix service not found. Skipping SMTP configuration."
+    fi
 }
 
 # Install and configure web server (Apache)
 function configure_web_server() {
     echo "Installing and configuring Apache web server..."
     sudo dnf install -y httpd php
-    sudo systemctl enable httpd
-    sudo systemctl start httpd
-    sudo mkdir -p /var/www/html
-    echo "<h1>Testing 123</h1>" | sudo tee /var/www/html/index.html
-    echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php
+    if systemctl list-units --type=service | grep -q httpd; then
+        sudo systemctl enable httpd
+        sudo systemctl start httpd
+        sudo mkdir -p /var/www/html
+        echo "<h1>Testing 123</h1>" | sudo tee /var/www/html/index.html
+        echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php
+    else
+        echo "Apache service not found. Skipping web server configuration."
+    fi
 }
 
 # Install and configure FTP server
 function configure_ftp_server() {
     echo "Installing and configuring ProFTPD..."
     sudo dnf install -y proftpd || echo "ProFTPD package not available. Skipping FTP server setup."
-    if command -v proftpd &> /dev/null; then
+    if systemctl list-units --type=service | grep -q proftpd; then
         sudo systemctl enable proftpd
         sudo systemctl start proftpd
+    else
+        echo "ProFTPD service not found. Skipping FTP server configuration."
     fi
 }
 

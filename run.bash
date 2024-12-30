@@ -3,20 +3,22 @@
 # Update system and install prerequisites
 echo "Updating system and installing prerequisites..."
 sudo dnf update -y
-sudo dnf install -y epel-release wget nano net-tools bind-utils firewalld mc postfix dovecot proftpd httpd php
+sudo dnf install -y epel-release wget nano net-tools bind-utils firewalld mc postfix dovecot httpd php dhcp-server
 
 # Basic setup
 function basic_setup() {
     echo "Setting up shell basics and permissions..."
     sudo yum install -y mc
-    sudo chmod u+x ~eit
-    setsebool -P httpd_enable_homedirs 1
+    if [ -d "/home/eit" ]; then
+        sudo chmod u+x /home/eit
+        setsebool -P httpd_enable_homedirs 1
+    else
+        echo "User directory /home/eit does not exist. Skipping permissions setup."
+    fi
 }
 
 # Network configuration
 echo "Configuring network settings..."
-sudo systemctl enable NetworkManager
-sudo systemctl start NetworkManager
 cat <<EOF | sudo tee /etc/sysconfig/network-scripts/ifcfg-eth0
 BOOTPROTO="static"
 IPADDR=192.168.60.200
@@ -25,9 +27,12 @@ GATEWAY=192.168.60.254
 DNS1=192.168.50.165
 DNS2=192.168.50.166
 EOF
-sudo systemctl restart network
-sudo systemctl enable firewalld
-sudo systemctl start firewalld
+if command -v nmcli &> /dev/null; then
+    sudo nmcli con reload
+    sudo nmcli con up eth0
+else
+    echo "NetworkManager CLI not found. Skipping network restart."
+fi
 
 # Install and configure DHCP server
 function configure_dhcp() {
@@ -50,6 +55,7 @@ function configure_dns() {
 # Install and configure SMTP (Postfix)
 function configure_smtp() {
     echo "Configuring Postfix SMTP server..."
+    sudo dnf install -y postfix
     sudo systemctl enable postfix
     sudo systemctl start postfix
 }
@@ -57,19 +63,22 @@ function configure_smtp() {
 # Install and configure web server (Apache)
 function configure_web_server() {
     echo "Installing and configuring Apache web server..."
+    sudo dnf install -y httpd php
     sudo systemctl enable httpd
     sudo systemctl start httpd
+    sudo mkdir -p /var/www/html
     echo "<h1>Testing 123</h1>" | sudo tee /var/www/html/index.html
     echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php
-    sudo mv /var/www/html/index.html /var/www/html/index-old.html
 }
 
 # Install and configure FTP server
 function configure_ftp_server() {
     echo "Installing and configuring ProFTPD..."
-    sudo dnf install -y proftpd
-    sudo systemctl enable proftpd
-    sudo systemctl start proftpd
+    sudo dnf install -y proftpd || echo "ProFTPD package not available. Skipping FTP server setup."
+    if command -v proftpd &> /dev/null; then
+        sudo systemctl enable proftpd
+        sudo systemctl start proftpd
+    fi
 }
 
 # Main script execution

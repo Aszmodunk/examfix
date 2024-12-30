@@ -3,7 +3,10 @@
 # Update system and install prerequisites
 echo "Updating system and installing prerequisites..."
 sudo dnf update -y
-sudo dnf install -y epel-release wget nano net-tools bind-utils firewalld mc postfix dovecot httpd php dhcp-server
+
+# Install all necessary packages in one step
+echo "Installing all required packages..."
+sudo dnf install -y epel-release wget nano net-tools bind-utils firewalld mc postfix dovecot httpd php dhcp-server proftpd libmemcached libmemcached-devel
 
 # Basic setup
 function basic_setup() {
@@ -47,10 +50,10 @@ function configure_dhcp() {
 function configure_dns() {
     echo "Installing and configuring DNS server..."
     sudo dnf install -y bind
-    wget -O /var/named/myvspj.cz https://alpha.kts.vspj.cz/~apribyl/myvspj.cz.txt
     if [ ! -d "/var/named" ]; then
         sudo mkdir -p /var/named
     fi
+    wget -O /var/named/myvspj.cz https://alpha.kts.vspj.cz/~apribyl/myvspj.cz.txt
     sudo systemctl enable named
     sudo systemctl start named
 }
@@ -58,7 +61,6 @@ function configure_dns() {
 # Install and configure SMTP (Postfix)
 function configure_smtp() {
     echo "Configuring Postfix SMTP server..."
-    sudo dnf install -y postfix
     if systemctl list-units --type=service | grep -q postfix; then
         sudo systemctl enable postfix
         sudo systemctl start postfix
@@ -69,8 +71,7 @@ function configure_smtp() {
 
 # Install and configure web server (Apache)
 function configure_web_server() {
-    echo "Installing and configuring Apache web server..."
-    sudo dnf install -y httpd php
+    echo "Installing and configuring Apache web server with PHP support..."
     if systemctl list-units --type=service | grep -q httpd; then
         sudo systemctl enable httpd
         sudo systemctl start httpd
@@ -85,7 +86,6 @@ function configure_web_server() {
 # Install and configure FTP server
 function configure_ftp_server() {
     echo "Installing and configuring ProFTPD..."
-    sudo dnf install -y proftpd || echo "ProFTPD package not available. Skipping FTP server setup."
     if systemctl list-units --type=service | grep -q proftpd; then
         sudo systemctl enable proftpd
         sudo systemctl start proftpd
